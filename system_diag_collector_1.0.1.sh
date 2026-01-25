@@ -183,7 +183,7 @@ collect_config_files() {
     # Копирование файлов с сохранением структуры
     for config in "${CONFIG_FILES[@]}"; do
         if [[ -f "$config" || -d "$config" ]]; then
-            rsync -aR "$config" "$TEMP_DIR/config/" 2>/dev/null
+            rsync -aRL --safe-links "$config" "$TEMP_DIR/config/" 2>/dev/null
             if [[ $? -eq 0 ]]; then
                 log_message "Скопирован: $config"
             else
