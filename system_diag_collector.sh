@@ -94,12 +94,42 @@ collect_system_info() {
 collect_logs() {
     log_message "Сбор журналов системы..."
     mkdir -p "$TEMP_DIR/logs"
-    dmesg > "$TEMP_DIR/logs/dmesg.txt"
-    journalctl --since "1 day ago" > "$TEMP_DIR/logs/journalctl.txt"
-    for log in /var/log/*; do
-        copy_large_file "$log" "$TEMP_DIR/logs/$(basename "$log")"
+
+    # Одиничные системные логи
+    dmesg > "$TEMP_DIR/logs/dmesg.txt" 2>/dev/null
+    journalctl --since "1 day ago" > "$TEMP_DIR/logs/journalctl.txt" 2>&1
+
+    # Обработка каждого элемента в /var/log/*
+    for log_path in /var/log/*; do
+        [[ ! -e "$log_path" ]] && continue  # Пропустить, если нет файлов
+
+        local base_name=$(basename "$log_path")
+
+        # Исключаем lastlog 
+        if [[ "$base_name" == "lastlog" ]]; then
+            log_message "Пропуск исключённого файла: $log_path"
+            continue
+        fi
+
+        local dest_name="$TEMP_DIR/logs/$base_name"
+
+        if [[ -f "$log_path" ]]; then
+            # Это обычный файл - применяем ограничение по размеру
+            copy_large_file "$log_path" "$dest_name"
+
+        elif [[ -d "$log_path" ]]; then
+            # Это директория - копируем рекурсивно
+            mkdir -p "$dest_name"
+            cp -rL "$log_path"/* "$dest_name/" 2>/dev/null
+            if [[ $? -eq 0 ]]; then
+                log_message "Скопирована директория логов: $log_path"
+            else
+                log_message "Не удалось скопировать содержимое: $log_path"
+            fi
+        fi
     done
-    log_message "Сбор журналов системы завершен."
+
+    log_message "Сбор журналов системы завершён."
 }
 
 # Модуль: Сбор конфигурационных файлов
