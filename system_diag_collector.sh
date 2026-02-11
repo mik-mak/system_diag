@@ -86,7 +86,7 @@ collect_system_info() {
     mkdir -p "$TEMP_DIR/system"
     uname -a > "$TEMP_DIR/system/uname.txt"
     cat /etc/os-release > "$TEMP_DIR/system/os-release.txt"
-    rpm -qa > "$TEMP_DIR/system/installed_packages.txt"
+#   rpm -qa > "$TEMP_DIR/system/installed_packages.txt" 
     log_message "Сбор системной информации завершен."
 }
 
@@ -279,11 +279,42 @@ collect_network_connections() {
 collect_storage_info() {
     log_message "Сбор информации о дисках и хранилище..."
     mkdir -p "$TEMP_DIR/storage"
-    df -h > "$TEMP_DIR/storage/df.txt"
-    lsblk > "$TEMP_DIR/storage/lsblk.txt"
+    df -h > "$TEMP_DIR/storage/df.txt" 2>/dev/null
+    lsblk > "$TEMP_DIR/storage/lsblk.txt" 2>/dev/null
     fdisk -l > "$TEMP_DIR/storage/fdisk.txt" 2>/dev/null
-    smartctl -a /dev/sda > "$TEMP_DIR/storage/smartctl_sda.txt" 2>/dev/null
-    log_message "Сбор информации о дисках и хранилище завершен."
+
+    # SMART для всех устройств
+    if command -v smartctl &>/dev/null; then
+        log_message "Сбор SMART с подключённых накопителей..."
+        # Собираем список блочных устройств: /dev/sda, /dev/nvme0n1 и т.д.
+        local devices=()
+        for dev in /dev/sd[a-z]; do
+            [[ -b "$dev" ]] && devices+=("$dev")
+        done
+
+        for dev in /dev/nvme[0-9]n[0-9]; do
+            [[ -b "$dev" ]] && devices+=("$dev")
+        done
+
+        # Собираем SMART для каждого устройства
+        for device in "${devices[@]}"; do
+            if [[ -b "$device" ]]; then
+                local safe_name=$(basename "$device")
+                smartctl -a "$device" > "$TEMP_DIR/storage/smartctl_${safe_name}.txt" 2>&1
+                if [[ -s "$TEMP_DIR/storage/smartctl_${safe_name}.txt" ]]; then
+					# Какие-то дурацкие коды возврата у smartctl
+                    log_message "SMART собран: $device"
+                else
+                    echo "=== Ошибка чтения SMART с $device ===" >> "$TEMP_DIR/storage/smartctl_${safe_name}.txt"
+                    log_message "Не удалось получить SMART-данные: $device"
+                fi
+            fi
+        done
+    else
+        log_message "Утилита smartctl не найдена. Пропускаем сбор SMART-данных."
+    fi
+
+    log_message "Сбор информации о дисках и хранилище завершён."
 }
 
 # Модуль: Сбор информации о смонтированных SMB и CIFS-шарах
@@ -316,13 +347,18 @@ collect_cifs_mounts() {
     log_message "Сбор информации о SMB/CIFS-шарах завершён."
 }
 
-# Модуль: Сбор информации о безопасности (SELinux)
+# Модуль: Сбор информации о безопасности (SELinux + аудит)
 collect_security_info() {
     log_message "Сбор информации о безопасности (SELinux)..."
     mkdir -p "$TEMP_DIR/security"
     getenforce > "$TEMP_DIR/security/selinux_status.txt"
     sestatus > "$TEMP_DIR/security/sestatus.txt" 2>/dev/null
-    log_message "Сбор информации о безопасности (SELinux) завершен."
+	if command -v aureport &>/dev/null; then
+		aureport -x --summary > "$TEMP_DIR/security/aureport.txt" 2>&1
+	else
+		log_message "aureport не найден. Установите auditd для сбора аудита."
+	fi
+    log_message "Сбор информации о безопасности завершен."
 }
 
 # Модуль: Сбор информации о процессах
@@ -361,7 +397,9 @@ collect_cron_info() {
 collect_installed_software() {
     log_message "Сбор информации об установленном программном обеспечении..."
     mkdir -p "$TEMP_DIR/software"
+	# Два слегка различных представления установленных пакетов
     rpm -qa > "$TEMP_DIR/software/rpm_packages.txt"
+	yum list installed > "$TEMP_DIR/software/yum_packages.txt"
     if command -v pip &>/dev/null; then
         mkdir -p "$TEMP_DIR/software/python"
         pip list --format=freeze > "$TEMP_DIR/software/python/pip_packages.txt"
@@ -473,7 +511,7 @@ collect_hardware_info() {
 
     # 4. Стандартные утилиты (почти всегда доступны)
     lscpu > "$TEMP_DIR/hardware/lscpu.txt" 2>/dev/null
-    lspci > "$TEMP_DIR/hardware/lspci.txt" 2>/dev/null
+    lspci -knn > "$TEMP_DIR/hardware/lspci.txt" 2>/dev/null
     lsusb > "$TEMP_DIR/hardware/lsusb.txt" 2>/dev/null
     dmesg | grep -i "memory\|bios\|acpi\|firmware" > "$TEMP_DIR/hardware/dmesg_hardware.txt" 2>&1
 
