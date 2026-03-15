@@ -399,12 +399,12 @@ collect_installed_software() {
     mkdir -p "$TEMP_DIR/software/yum"
 	# Два слегка различных представления установленных пакетов
     rpm -qa > "$TEMP_DIR/software/yum/rpm_packages.txt"
-	yum list installed > "$TEMP_DIR/software/yum/yum_packages.txt"
-	# Сбор информации о репозиториях
-	yum list available > "$TEMP_DIR/software/yum/yum_packages_avlbl.txt"
-   	yum repolist -v > "$TEMP_DIR/software/yum/yum_repolist.txt"
-	yum history -v > "$TEMP_DIR/software/yum/yum_history.txt"
-	yum check-update --changelogs > "$TEMP_DIR/software/yum/yum_chkupdt.txt" || true #TODO Hangs OSO
+    yum list installed > "$TEMP_DIR/software/yum/yum_packages.txt"
+    # Сбор информации о репозиториях
+    yum list available > "$TEMP_DIR/software/yum/yum_packages_avlbl.txt"
+    yum repolist -v > "$TEMP_DIR/software/yum/yum_repolist.txt"
+    yum history -v > "$TEMP_DIR/software/yum/yum_history.txt"
+    yum check-update --changelogs > "$TEMP_DIR/software/yum/yum_chkupdt.txt" || true #TODO Hangs OSO
 	
     if command -v pip &>/dev/null; then
         mkdir -p "$TEMP_DIR/software/python"
