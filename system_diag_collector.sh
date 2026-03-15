@@ -402,7 +402,7 @@ collect_installed_software() {
 	yum list installed > "$TEMP_DIR/software/yum/yum_packages.txt"
 	# Сбор информации о репозиториях
 	yum list available > "$TEMP_DIR/software/yum/yum_packages_avlbl.txt"
-    yum repolist -v > "$TEMP_DIR/software/yum/yum_repolist.txt"
+   	yum repolist -v > "$TEMP_DIR/software/yum/yum_repolist.txt"
 	yum history -v > "$TEMP_DIR/software/yum/yum_history.txt"
 	yum check-update --changelogs > "$TEMP_DIR/software/yum/yum_chkupdt.txt" || true #TODO Hangs OSO
 	
