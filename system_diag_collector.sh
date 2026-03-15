@@ -396,10 +396,16 @@ collect_cron_info() {
 # Модуль: Сбор информации об установленном ПО
 collect_installed_software() {
     log_message "Сбор информации об установленном программном обеспечении..."
-    mkdir -p "$TEMP_DIR/software"
+    mkdir -p "$TEMP_DIR/software/yum"
 	# Два слегка различных представления установленных пакетов
-    rpm -qa > "$TEMP_DIR/software/rpm_packages.txt"
-	yum list installed > "$TEMP_DIR/software/yum_packages.txt"
+    rpm -qa > "$TEMP_DIR/software/yum/rpm_packages.txt"
+	yum list installed > "$TEMP_DIR/software/yum/yum_packages.txt"
+	# Сбор информации о репозиториях
+	yum list available > "$TEMP_DIR/software/yum/yum_packages_avlbl.txt"
+    yum repolist -v > "$TEMP_DIR/software/yum/yum_repolist.txt"
+	yum history -v > "$TEMP_DIR/software/yum/yum_history.txt"
+	yum check-update --changelogs > "$TEMP_DIR/software/yum/yum_chkupdt.txt" || true #TODO Hangs OSO
+	
     if command -v pip &>/dev/null; then
         mkdir -p "$TEMP_DIR/software/python"
         pip list --format=freeze > "$TEMP_DIR/software/python/pip_packages.txt"
