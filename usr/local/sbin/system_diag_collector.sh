@@ -133,21 +133,34 @@ collect_user_configs() {
         [[ -f "$home_dir/cinnamon.dconf" ]] && cp "$home_dir/cinnamon.dconf" "$user_out_dir/config/" 2>/dev/null
         [[ -f "$home_dir/.Xauthority" ]] && cp "$home_dir/.Xauthority" "$user_out_dir/config/" 2>/dev/null
 
-        # --- БЛОК 2: Директория .config/ (Выборочно) ---
+        # --- БЛОК 2: Директория .config/ (Полное копирование, кроме браузеров) ---
         if [[ -d "$home_dir/.config" ]]; then
             local cfg_src="$home_dir/.config"
             local cfg_dst="$user_out_dir/config"
 
-            # Директории (копируем полностью)
-            for dir in alteroffice autostart cinnamon cinnamon-session dconf gtk-3.0 menus nautilus nemo pulse tigervnc xed; do
-                if [[ -d "$cfg_src/$dir" ]]; then
-                    cp -r "$cfg_src/$dir" "$cfg_dst/" 2>/dev/null
-                fi
-            done
+            log_message "Копирование .config (исключая браузеры)..."
+            for item in "$cfg_src"/*; do
+                # Если элемент не существует, пропускаем
+                [[ ! -e "$item" ]] && continue
 
-            # Файлы настроек
-            for file in mimeapps.list user-dirs.dirs user-dirs.locale; do
-                [[ -f "$cfg_src/$file" ]] && cp "$cfg_src/$file" "$cfg_dst/" 2>/dev/null
+                local item_name
+                item_name=$(basename "$item")
+
+                # СПИСОК ИСКЛЮЧЕНИЙ (Браузеры и кэш)
+                case "$item_name" in
+                    yandex-browser|google-chrome|chromium|mozilla|firefox|Brave|Opera|cache)
+                        log_message "Пропущено (браузер/кэш): $item_name"
+                        continue
+                        ;;
+                esac
+
+                # Если директория, то копируем рекурсивно
+                if [[ -d "$item" ]]; then
+                    cp -rL "$item" "$cfg_dst/" 2>/dev/null
+                # Если файл
+                elif [[ -f "$item" ]]; then
+                    cp -L "$item" "$cfg_dst/" 2>/dev/null
+                fi
             done
         fi
 
@@ -170,7 +183,7 @@ collect_user_configs() {
             # Директории SSL и cache
             for dir in SSL cache; do
                 if [[ -d "$ctx_src/$dir" ]]; then
-                    cp -r "$ctx_src/$dir" "$ctx_dst/" 2>/dev/null
+                    cp -rL "$ctx_src/$dir" "$ctx_dst/" 2>/dev/null
                 fi
             done
         fi
