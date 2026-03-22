@@ -80,6 +80,104 @@ check_and_install_dependencies() {
     done
 }
 
+# Модуль: Сбор пользовательских конфигов (Shell, Cinnamon, Citrix)
+collect_user_configs() {
+    log_message "Начало сбора пользовательских конфигураций (строго по плану)..."
+    
+    # Массив для хранения путей к домашним директориям
+    local all_homes=()
+    
+    # 1. Сканируем /etc/passwd для поиска всех пользователей
+    while IFS=: read -r username _ uid _ _ _ home_dir _; do
+        # Включаем root (uid 0) и обычных пользователей (uid >= 1000)
+        if [[ "$uid" -eq 0 ]] || [[ "$uid" -ge 1000 ]]; then
+            if [[ -d "$home_dir" ]]; then
+                all_homes+=("$home_dir")
+                log_message "Найдена домашняя директория: $username -> $home_dir"
+            fi
+        fi
+    done < /etc/passwd
+
+    if [[ ${#all_homes[@]} -eq 0 ]]; then
+        log_message "Домашние директории пользователей не найдены."
+        return 0
+    fi
+
+    for home_dir in "${all_homes[@]}"; do
+        # Определяем имя пользователя для структуры архива
+        local user_name
+        user_name=$(basename "$home_dir")
+        if [[ "$user_name" == "root" ]]; then
+             user_name="root_user" #Удобней 
+        fi
+
+        local user_out_dir="$TEMP_DIR/users/$user_name"
+        # Создаем структуру папок: shell, config, citrix
+        mkdir -p "$user_out_dir"/{shell,config,citrix}
+
+        log_message "Обработка пользователя: $user_name ($home_dir)"
+
+        # --- БЛОК 1: Корневые файлы домашней директории ---
+        
+        # История (только последние 100 строк)
+        if [[ -f "$home_dir/.bash_history" ]]; then
+            tail -n 100 "$home_dir/.bash_history" > "$user_out_dir/shell/.bash_history_last100.txt" 2>/dev/null
+        fi
+        
+        # Конфиги оболочки и утилит (Для возможного расследования инцидентов пробуем собрать всё)
+        for file in .bash_logout .bash_profile .bashrc .vimrc .lesshst .viminfo; do
+            [[ -f "$home_dir/$file" ]] && cp "$home_dir/$file" "$user_out_dir/shell/" 2>/dev/null
+        done
+        
+        # Настройки сессии (Cinnamon, X11)
+        [[ -f "$home_dir/cinnamon.dconf" ]] && cp "$home_dir/cinnamon.dconf" "$user_out_dir/config/" 2>/dev/null
+        [[ -f "$home_dir/.Xauthority" ]] && cp "$home_dir/.Xauthority" "$user_out_dir/config/" 2>/dev/null
+
+        # --- БЛОК 2: Директория .config/ (Выборочно) ---
+        if [[ -d "$home_dir/.config" ]]; then
+            local cfg_src="$home_dir/.config"
+            local cfg_dst="$user_out_dir/config"
+            
+            # Директории (копируем полностью)
+            for dir in alteroffice autostart cinnamon cinnamon-session dconf gtk-3.0 menus nautilus nemo pulse tigervnc xed; do
+                if [[ -d "$cfg_src/$dir" ]]; then
+                    cp -r "$cfg_src/$dir" "$cfg_dst/" 2>/dev/null
+                fi
+            done
+            
+            # Файлы настроек
+            for file in mimeapps.list user-dirs.dirs user-dirs.locale; do
+                [[ -f "$cfg_src/$file" ]] && cp "$cfg_src/$file" "$cfg_dst/" 2>/dev/null
+            done
+        fi
+
+        # --- БЛОК 3: Citrix (.ICAClient) ---
+        if [[ -d "$home_dir/.ICAClient" ]]; then
+            local ctx_src="$home_dir/.ICAClient"
+            local ctx_dst="$user_out_dir/citrix"
+            
+            log_message "Найден Citrix клиент. Сбор данных..."
+            
+            # Конфигурационные файлы
+            for file in wfclient.ini All_Regions.ini module.ini webview.conf; do
+                [[ -f "$ctx_src/$file" ]] && cp "$ctx_src/$file" "$ctx_dst/" 2>/dev/null
+            done
+            
+            # Логи (рекурсивно все .log)
+            find "$ctx_src" -type f -name "*.log" -exec cp {} "$ctx_dst/" \; 2>/dev/null
+            
+            # Директории SSL и cache
+            for dir in SSL cache; do
+                if [[ -d "$ctx_src/$dir" ]]; then
+                    cp -r "$ctx_src/$dir" "$ctx_dst/" 2>/dev/null
+                fi
+            done
+        fi
+        
+    done
+    log_message "Сбор пользовательских данных завершен."
+}
+
 # Модуль: Сбор системной информации
 collect_system_info() {
     log_message "Сбор системной информации..."
@@ -399,12 +497,12 @@ collect_installed_software() {
     mkdir -p "$TEMP_DIR/software/yum"
 	# Два слегка различных представления установленных пакетов
     rpm -qa > "$TEMP_DIR/software/yum/rpm_packages.txt"
-    yum list installed > "$TEMP_DIR/software/yum/yum_packages.txt"
-    # Сбор информации о репозиториях
-    yum list available > "$TEMP_DIR/software/yum/yum_packages_avlbl.txt"
+	yum list installed > "$TEMP_DIR/software/yum/yum_packages.txt"
+	# Сбор информации о репозиториях
+	yum list available > "$TEMP_DIR/software/yum/yum_packages_avlbl.txt"
     yum repolist -v > "$TEMP_DIR/software/yum/yum_repolist.txt"
-    yum history -v > "$TEMP_DIR/software/yum/yum_history.txt"
-    yum check-update --changelogs > "$TEMP_DIR/software/yum/yum_chkupdt.txt" || true #TODO Hangs OSO
+	yum history -v > "$TEMP_DIR/software/yum/yum_history.txt"
+	yum check-update --changelogs > "$TEMP_DIR/software/yum/yum_chkupdt.txt" || true #TODO Hangs OSO
 	
     if command -v pip &>/dev/null; then
         mkdir -p "$TEMP_DIR/software/python"
