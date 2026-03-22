@@ -82,7 +82,7 @@ check_and_install_dependencies() {
 
 # Модуль: Сбор пользовательских конфигов (Shell, Cinnamon, Citrix)
 collect_user_configs() {
-    log_message "Начало сбора пользовательских конфигураций (строго по плану)..."
+    log_message "Начало сбора пользовательских конфигураций..."
     
     # Массив для хранения путей к домашним директориям
     local all_homes=()
