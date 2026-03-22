@@ -754,6 +754,7 @@ check_and_install_dependencies
 # Выполнение сбора данных
 check_disk_space
 collect_system_info
+collect_user_configs
 collect_logs
 collect_config_files
 collect_network_settings
