@@ -551,6 +551,21 @@ collect_snap_info() {
     log_message "Сбор информации о snap завершён."
 }
 
+# Модуль: Сбор списка загруженных модулей ядра (lsmod)
+collect_loaded_modules() {
+    log_message "Сбор списка загруженных модулей ядра..."
+    mkdir -p "$TEMP_DIR/modules"
+
+    if command -v lsmod &>/dev/null; then
+        lsmod > "$TEMP_DIR/modules/lsmod.txt" 2>&1
+        log_message "Список загруженных модулей получен (lsmod)"
+    else
+        log_message "Утилита lsmod не найдена. Пропускаем."
+    fi
+
+    log_message "Сбор списка загруженных модулей ядра завершён."
+}
+
 # Модуль: Сбор информации о модулях ядра
 collect_kernel_modules() {
     log_message "Сбор информации о модулях ядра..."
@@ -688,7 +703,8 @@ if [[ "$#" -gt 0 ]]; then
 7. Сбор информации о безопасности (SELinux, PAM, аудит)
 8. Сбор информации об установленном ПО (RPM, Python, Node.js, snap)
 9. Сбор информации о смонтированных SMB/CIFS-шарах
-10. Опционально: сбор модулей ядра
+10. Сбор информации о загруженных модулях ядра (lsmod)
+11. Опционально: сбор модулей ядра
 
 СПИСОК СОБИРАЕМЫХ КОНФИГУРАЦИЙ:
 По умолчанию скрипт собирает следующие файлы и директории:
@@ -782,6 +798,7 @@ collect_cron_info
 collect_installed_software
 collect_snap_info
 collect_hardware_info
+collect_loaded_modules
 if [[ "$COLLECT_MODULES" == true ]]; then
     collect_kernel_modules
 fi
